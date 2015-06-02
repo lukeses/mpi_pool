@@ -15,6 +15,7 @@ struct request_item{
     int type;
     int lamport_clock;
     int gender;
+    int process_id;
     };
 
 
@@ -30,6 +31,7 @@ int timestamp;
 
 
 struct request_item *tmp;
+struct request_item *m_temp, *min;
 struct list_head *pos, *q;
 struct request_item mylist;
 
@@ -59,28 +61,65 @@ void* messanger(void* _arg){
         tmp->type = recv.type;
         tmp->lamport_clock = recv.lamport_clock;
         tmp->gender = recv.gender;
+        tmp->process_id = recv.process_id;
         list_add(&(tmp->list), &(mylist.list));
         pthread_mutex_unlock(&mutex);
+printf("GENDER: %d\n", tmp->gender);
+
 
         request send;
         send.type = 2001;
         send.lamport_clock = timestamp;
-        send.process_id = rank; 
+        send.process_id = rank;
+        send.gender = gender; 
         MPI_Send(&send, 1, mpi_pool_message, recv.process_id, MSG_REQUEST, MPI_COMM_WORLD);
-        printf("Wyslalem MSG_REQUEST 1001\n");
+        //printf("Wyslalem MSG_REQUEST 1001\n");
       }
       else if(recv.type == 2001){
-        printf("Odebralem MSG_REQUEST 1001\n");
+        //printf("Odebralem MSG_REQUEST 1001\n");
         //TO DO liczenie ile requestow dostalem
         pthread_mutex_lock(&mutex); 
         counter++;
         pthread_mutex_unlock(&mutex);
       }
+      else if(recv.type == 3001){
+        //printf("Odebralem MSG_REQUEST 3001\n");
+        pthread_mutex_lock(&mutex);  
 
+        // list_for_each_safe(pos, q, &mylist.list){
+        //      tmp= list_entry(pos, struct request_item, list);
+        //      //printf("freeing item to= %d from= %d\n", m_temp->to, m_temp->from);
+        //      if(tmp->process_id == recv.process_id){
+        //         list_del(pos);
+        //         free(tmp);
+        //         printf("Usunalem gnoja");
+        //     }
+        // }
       list_for_each(pos, &mylist.list){
          tmp= list_entry(pos, struct request_item, list);
-         printf("type= %d lamport_clock= %d\n", tmp->type, tmp->lamport_clock);
+         //printf("PRZED rank= %d gender= %d process_id= %d\n", rank, tmp->gender, tmp->process_id);
       }
+
+        list_for_each_safe(pos, q, &mylist.list){
+           m_temp= list_entry(pos, struct request_item, list);
+           //printf("m_temp przed usunieciem - lamport: %d , process_id: %d\n", m_temp->lamport_clock, m_temp->process_id);
+           //printf("recv przed usunieciem - lamport: %d , process_id: %d\n", recv.lamport_clock, recv.process_id);
+           //printf("freeing item to= %d from= %d\n", m_temp->to, m_temp->from);
+           if(m_temp->process_id == recv.process_id && m_temp->lamport_clock == recv.lamport_clock){
+              list_del(pos);
+              free(m_temp);
+              //printf("Usunalem gnoja\n");
+          }
+        }
+
+        pthread_mutex_unlock(&mutex);
+
+      }
+      printf("\n");
+      // list_for_each(pos, &mylist.list){
+      //    tmp= list_entry(pos, struct request_item, list);
+      //    printf("rank= %d gender= %d process_id= %d\n", rank, tmp->gender, tmp->process_id);
+      // }
 
 
 
@@ -159,7 +198,7 @@ int main( int argc, char **argv )
     MPI_Type_commit(&mpi_pool_message);
 
 //ustawienie plci
-  gender = rank % 2 + 1;
+  gender = 1;//rank % 2 + 1;
 
 
 
@@ -196,6 +235,8 @@ int main( int argc, char **argv )
   tmp= (struct request_item *)malloc(sizeof(struct request_item));
   tmp->type = 1001;
   tmp->lamport_clock = timestamp;
+  tmp->gender = gender;
+  tmp->process_id = rank;
   list_add(&(tmp->list), &(mylist.list));
 
 
@@ -234,13 +275,75 @@ int main( int argc, char **argv )
   // }
 
   //oczekiwanie na spelnienie warunkow
- printf("Gender: %d\n", gender);
-  while(!(counter == size-1 && any_locker_room_available() == 1 )){
+  min= (struct request_item *)malloc(sizeof(struct request_item));
+  //min->type = recv.type;
+  min->lamport_clock = 9999999;
+  //min->gender = recv.gender;
+  min->process_id = 99999999;
+  printf("Gender: %d\n", gender);
+  while(!(counter == size-1 && any_locker_room_available() == 1 && min->process_id == rank)){
+  min= (struct request_item *)malloc(sizeof(struct request_item));
+  //min->type = recv.type;
+  min->lamport_clock = 9999999;
+  //min->gender = recv.gender;
+  min->process_id = 99999999;
+  //min->gender = recv.gender;
+
     //printf("%d %d %d %d \n", gender, who_in_locker_rooms[0], who_in_locker_rooms[0], who_in_locker_rooms[0]);
+      pthread_mutex_lock(&mutex);
+        list_for_each(pos, &mylist.list){
+          m_temp= list_entry(pos, struct request_item, list);
+          if(m_temp->lamport_clock < min->lamport_clock){
+            min = m_temp;
+          }
+          else if(m_temp->lamport_clock == min->lamport_clock && m_temp->process_id < min->process_id){
+            min = m_temp;
+          }
+          //printf("type= %d lamport_clock= %d\n", tmp->type, tmp->lamport_clock);
+      }
+        pthread_mutex_unlock(&mutex);
   }
-  printf("WCHODZE!!\n");
+  printf("WCHODZE!! %d %d \n", rank, gender);
+  pthread_mutex_lock(&mutex);
+
+  int lock_num;
+  for(lock_num = 0; lock_num < 3; lock_num ++){
+    if(locker_room_available(lock_num)){
+      my_locker_room = lock_num;
+      who_in_locker_rooms[lock_num] = gender;
+      locker_rooms[lock_num]--;
+      break;
+    }   
+  }
+
+  pthread_mutex_unlock(&mutex);
+
+  pthread_mutex_lock(&mutex);
+  list_for_each_safe(pos, q, &mylist.list){
+       m_temp= list_entry(pos, struct request_item, list);
+       //printf("freeing item to= %d from= %d\n", m_temp->to, m_temp->from);
+       if(m_temp->process_id == min->process_id && m_temp->lamport_clock == min->lamport_clock){
+          list_del(pos);
+          free(m_temp);
+          //printf("a a tez usunalem co mialem\n");
+      }
+  }
+  pthread_mutex_unlock(&mutex);
 
 
+        request send;
+        send.type = 3001;
+        send.process_id = rank;
+        send.gender = gender;
+        for(j=0; j < size; j++){
+          if(j != rank){
+            MPI_Send(&send, 1, mpi_pool_message, j, MSG_REQUEST, MPI_COMM_WORLD);
+          }
+      }
+
+while(1){
+
+}
 
 
   pthread_join(message_thread,NULL);  

@@ -99,9 +99,36 @@ int main(int argc, char **argv){
     list_for_each_safe(pos, q, &mylist.list){
          tmp= list_entry(pos, struct kool_list, list);
          printf("freeing item to= %d from= %d\n", tmp->to, tmp->from);
-         list_del(pos);
-         free(tmp);
+         if(tmp->to == 2){
+            list_del(pos);
+            free(tmp);
+        }
     }
+
+
+    printf("traversing the list using list_for_each()\n");
+    list_for_each(pos, &mylist.list){
+
+        /* at this point: pos->next points to the next item's 'list' variable and 
+         * pos->prev points to the previous item's 'list' variable. Here item is 
+         * of type struct kool_list. But we need to access the item itself not the 
+         * variable 'list' in the item! macro list_entry() does just that. See "How
+         * does this work?" below for an explanation of how this is done.
+         */
+         tmp= list_entry(pos, struct kool_list, list);
+
+         /* given a pointer to struct list_head, type of data structure it is part of,
+          * and it's name (struct list_head's name in the data structure) it returns a
+          * pointer to the data structure in which the pointer is part of.
+          * For example, in the above line list_entry() will return a pointer to the
+          * struct kool_list item it is embedded in!
+          */
+
+         printf("to= %d from= %d\n", tmp->to, tmp->from);
+
+    }
+
+
 
     return 0;
 }
