@@ -88,7 +88,22 @@ void* messanger(void* _arg){
   return 0;
 } 
 
+int locker_room_available(int num){
+  if(locker_rooms[num] > 0 && (who_in_locker_rooms[num] == gender || who_in_locker_rooms[num] == 0))
+    return 1;
+  else
+    return 0;
+}
 
+
+int any_locker_room_available(){
+//  printf("%d %d %d", locker_room_available(0), locker_room_available(1), locker_room_available(2));
+  if(locker_room_available(0) || locker_room_available(1) || locker_room_available(2))
+    return 1;
+  else
+    return 0;
+
+}
 
 int main( int argc, char **argv )
 {
@@ -106,7 +121,7 @@ int main( int argc, char **argv )
   int where_i_am = 0; //0 - przed wejsciem do szatni, 1 - szatnia, 2 - prysznic, 3 - basen
   for(i = 0; i < 3; i++){
     locker_rooms[i] = M;
-    who_in_locker_rooms[i] = 0;
+    who_in_locker_rooms[i] = 1;
   }
 
 
@@ -220,7 +235,7 @@ int main( int argc, char **argv )
 
   //oczekiwanie na spelnienie warunkow
  printf("Gender: %d\n", gender);
-  while(counter < size-1 || (who_in_locker_rooms[0] != gender && who_in_locker_rooms[1] != gender && who_in_locker_rooms[2] != gender)){
+  while(!(counter == size-1 && any_locker_room_available() == 1 )){
     //printf("%d %d %d %d \n", gender, who_in_locker_rooms[0], who_in_locker_rooms[0], who_in_locker_rooms[0]);
   }
   printf("WCHODZE!!\n");
