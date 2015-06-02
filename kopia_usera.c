@@ -112,6 +112,15 @@ printf("GENDER: %d\n", tmp->gender);
           }
         }
 
+        int lock_num;
+        for(lock_num = 0; lock_num < 3; lock_num ++){
+          if(locker_room_available(lock_num)){
+            who_in_locker_rooms[lock_num] = recv.gender;
+            locker_rooms[lock_num]--;
+            break;
+          }   
+        }
+
         pthread_mutex_unlock(&mutex);
 
       }
@@ -208,25 +217,6 @@ int main( int argc, char **argv )
   pthread_t message_thread;
   pthread_create(&message_thread,NULL,messanger,NULL); 
 
-
-// while(1){
-//   //chec wejscia do szatni
-
-//   //zwiekszenie zegaru lamporta
-//   timestamp++;
-//   //dodanie zadania do wlasnej kolejki
-//   list[i] = timestamp;
-//   //wyslanie zadania do innych procesow
-//   request send;
-//   send.type = 1001;
-//   send.lamport_clock = timestamp;
-//   send.process_id = rank;
-
-//   MPI_Bcast(&send, 1, mpi_pool_message, rank, MPI_COMM_WORLD);
-
-//   //printf("Rank %d: sent structure car\n", rank);
-// }
-
   pthread_mutex_lock(&mutex);
   //zwiekszenie zegaru lamporta
   timestamp++;
@@ -240,8 +230,6 @@ int main( int argc, char **argv )
   list_add(&(tmp->list), &(mylist.list));
 
 
-
-
   int j = 0;
 //wyslanie zadania do innych procesow
   sender = rank;
@@ -252,8 +240,6 @@ int main( int argc, char **argv )
         send.process_id = rank;
         send.gender = gender;
   pthread_mutex_unlock(&mutex);
-        //MPI_Bcast(&send, 1, mpi_pool_message, sender, MPI_COMM_WORLD);
-//MPI_Send( msg, MSG_SIZE, MPI_INT, receiver, MSG_HELLO, MPI_COMM_WORLD );
         for(j=0; j < size; j++){
           if(j != rank){
             MPI_Send(&send, 1, mpi_pool_message, j, MSG_REQUEST, MPI_COMM_WORLD);
@@ -265,29 +251,20 @@ int main( int argc, char **argv )
     //dla pewnosci, gdyby if sie nie wykonal, chociaz w tej chwili musi bo sender == rank, dla pamieci o tym 
     pthread_mutex_unlock(&mutex);
   }
-  // else
-  // {
-  //       request recv;
 
-  //       MPI_Bcast(&recv,   1, mpi_pool_message, sender, MPI_COMM_WORLD);
-  //       printf("Rank %d: Type: %d lamport_clock = %d process_id = %d\n", rank,
-  //                recv.type, recv.lamport_clock, recv.process_id);
-  // }
 
   //oczekiwanie na spelnienie warunkow
   min= (struct request_item *)malloc(sizeof(struct request_item));
-  //min->type = recv.type;
+
   min->lamport_clock = 9999999;
-  //min->gender = recv.gender;
+
   min->process_id = 99999999;
   printf("Gender: %d\n", gender);
   while(!(counter == size-1 && any_locker_room_available() == 1 && min->process_id == rank)){
+  sleep(rank);
   min= (struct request_item *)malloc(sizeof(struct request_item));
-  //min->type = recv.type;
   min->lamport_clock = 9999999;
-  //min->gender = recv.gender;
   min->process_id = 99999999;
-  //min->gender = recv.gender;
 
     //printf("%d %d %d %d \n", gender, who_in_locker_rooms[0], who_in_locker_rooms[0], who_in_locker_rooms[0]);
       pthread_mutex_lock(&mutex);
@@ -342,7 +319,7 @@ int main( int argc, char **argv )
       }
 
 while(1){
-
+    sleep(2);
 }
 
 
