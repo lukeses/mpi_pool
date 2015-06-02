@@ -4,6 +4,7 @@ typedef struct request_s{
 	int type;
 	int lamport_clock;
 	int process_id;
+  int gender;
 //	struct request *next;
 } request;
 

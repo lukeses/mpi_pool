@@ -14,6 +14,7 @@ struct request_item{
     struct list_head list;
     int type;
     int lamport_clock;
+    int gender;
     };
 
 
@@ -25,6 +26,8 @@ MPI_Datatype mpi_pool_message;
 MPI_Status status;
 int sender;
 int rank;
+int timestamp;
+
 
 struct request_item *tmp;
 struct list_head *pos, *q;
@@ -35,7 +38,8 @@ pthread_mutexattr_t attr;
 
 int locker_rooms[3];
 int who_in_locker_rooms[3]; // 0 - nikt, 1 - kobieta, 2 - mezczyzna
-
+int counter=0;
+int gender;
 
 
 void* messanger(void* _arg){
@@ -48,13 +52,30 @@ void* messanger(void* _arg){
     while(1){
       MPI_Recv(&recv, 1, mpi_pool_message, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 //      printf("Rank %d: Type: %d lamport_clock = %d process_id = %d\n", rank, recv.type, recv.lamport_clock, recv.process_id);
-      pthread_mutex_lock(&mutex);  
-      tmp= (struct request_item *)malloc(sizeof(struct request_item));
-      tmp->type = recv.type;
-      tmp->lamport_clock = recv.lamport_clock;
 
-      list_add(&(tmp->list), &(mylist.list));
-      pthread_mutex_unlock(&mutex);
+      if (recv.type == 1001){
+        pthread_mutex_lock(&mutex);  
+        tmp= (struct request_item *)malloc(sizeof(struct request_item));
+        tmp->type = recv.type;
+        tmp->lamport_clock = recv.lamport_clock;
+        tmp->gender = recv.gender;
+        list_add(&(tmp->list), &(mylist.list));
+        pthread_mutex_unlock(&mutex);
+
+        request send;
+        send.type = 2001;
+        send.lamport_clock = timestamp;
+        send.process_id = rank; 
+        MPI_Send(&send, 1, mpi_pool_message, recv.process_id, MSG_REQUEST, MPI_COMM_WORLD);
+        printf("Wyslalem MSG_REQUEST 1001\n");
+      }
+      else if(recv.type == 2001){
+        printf("Odebralem MSG_REQUEST 1001\n");
+        //TO DO liczenie ile requestow dostalem
+        pthread_mutex_lock(&mutex); 
+        counter++;
+        pthread_mutex_unlock(&mutex);
+      }
 
       list_for_each(pos, &mylist.list){
          tmp= list_entry(pos, struct request_item, list);
@@ -76,15 +97,20 @@ int main( int argc, char **argv )
   int namelen;
   int i;
 
-  int timestamp = 0;
+  timestamp = 0;
 
   int provided;
   int M = 5; //ilosc wolnych szafek w kazdej z szatni
   int P = 2*M; // 2/3 ilosci wszystkich szafek
   int my_locker_room; //zmienna do przechowywania szatni
+  int where_i_am = 0; //0 - przed wejsciem do szatni, 1 - szatnia, 2 - prysznic, 3 - basen
   for(i = 0; i < 3; i++){
     locker_rooms[i] = M;
+    who_in_locker_rooms[i] = 0;
   }
+
+
+
 
 
 //semafory
@@ -104,21 +130,21 @@ int main( int argc, char **argv )
 
 
     /* create a type for struct car */
-    const int nitems=3;
-    int          blocklengths[3] = {1,1,1};
-    MPI_Datatype types[3] = {MPI_INT, MPI_INT, MPI_INT};
+    const int nitems=4;
+    int          blocklengths[4] = {1,1,1,1};
+    MPI_Datatype types[4] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT};
 
-    MPI_Aint     offsets[3];
+    MPI_Aint     offsets[4];
 
     offsets[0] = offsetof(request, type);
     offsets[1] = offsetof(request, lamport_clock);
     offsets[2] = offsetof(request, process_id);
-
+    offsets[3] = offsetof(request, gender);
     MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_pool_message);
     MPI_Type_commit(&mpi_pool_message);
 
-
-
+//ustawienie plci
+  gender = rank % 2 + 1;
 
 
 
@@ -167,7 +193,8 @@ int main( int argc, char **argv )
         request send;
         send.type = 1001;
         send.lamport_clock = timestamp;
-        send.process_id = 15;
+        send.process_id = rank;
+        send.gender = gender;
   pthread_mutex_unlock(&mutex);
         //MPI_Bcast(&send, 1, mpi_pool_message, sender, MPI_COMM_WORLD);
 //MPI_Send( msg, MSG_SIZE, MPI_INT, receiver, MSG_HELLO, MPI_COMM_WORLD );
@@ -192,7 +219,11 @@ int main( int argc, char **argv )
   // }
 
   //oczekiwanie na spelnienie warunkow
-  
+ printf("Gender: %d\n", gender);
+  while(counter < size-1 || (who_in_locker_rooms[0] != gender && who_in_locker_rooms[1] != gender && who_in_locker_rooms[2] != gender)){
+    //printf("%d %d %d %d \n", gender, who_in_locker_rooms[0], who_in_locker_rooms[0], who_in_locker_rooms[0]);
+  }
+  printf("WCHODZE!!\n");
 
 
 
